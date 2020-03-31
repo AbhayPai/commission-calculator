@@ -1,0 +1,11 @@
+{
+  "name": "commission-calculator",
+  "version": "1.0.0",
+  "description": "small demonstration",
+  "main": "index.js",
+  "author": "Abhay Pai",
+  "license": "ISC",
+  "dependencies": {
+    "node-fetch": "^2.6.0"
+  }
+}
