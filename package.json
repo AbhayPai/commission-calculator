@@ -6,6 +6,7 @@
   "author": "Abhay Pai",
   "license": "ISC",
   "dependencies": {
+    "moment": "^2.24.0",
     "node-fetch": "^2.6.0"
   }
 }

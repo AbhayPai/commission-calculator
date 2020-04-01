@@ -1,77 +1,51 @@
-const FS = require('fs');
 const PATH = require('path');
 const FILE_ARG = process.argv[2];
-const FETCH = require("node-fetch");
-const VALIDATEFILE = require('./validateFile');
+const GETDATA = require('./helpers/getData');
+const GETASYNCCICOMM = require('./async/getAsyncCashInCommission');
+const GETASYNCCOCOMM = require('./async/getAsyncCashOutCommission');
 
+/*
+ *  Validating if file argument is present or not
+ */
 if(typeof FILE_ARG === 'undefined') {
   console.error('Error: Please enter second argument.');
   return;
 }
 
+/*
+ *  Validating if file argument is valid extension or not
+ */
 if(PATH.extname(FILE_ARG) !== '.json') {
   console.error('Error: Please check file extension.');
   return;
 }
 
-const datas = (() => {
-  const tempRawData = FS.readFileSync(FILE_ARG);
+/*
+ *  Storing json data in constant
+ */
+const transactions = GETDATA(FILE_ARG);
 
-  if(!VALIDATEFILE(tempRawData)) {
-    console.log(`Error: ${FILE_ARG} failed to read.`)
-    return;
+/*
+ *  Async Approach
+ */
+transactions.forEach(async (transaction) => {
+  if(transaction.type === 'cash_in') {
+    GETASYNCCICOMM(transaction)
+      .then(async commission => {
+        console.log(`User: ${transaction.user_id} | Amount: ${transaction.operation.amount} | Transaction Type: ${transaction.type} | Transaction Date: ${transaction.date} | Commission: ${commission}`);
+      })
+      .catch(err => {
+        console.log('Error: something went wrong in calling GETASYNCCICOMM');
+      });
   }
 
-  const tempJsonData = JSON.parse(tempRawData);
-  return tempJsonData;
-})();
-
-const getAsyncConfig = async (tempAPI) => {
-  const tempConfigRawData = await FETCH(tempAPI);
-  return tempConfigRawData.json();
-};
-
-const asyncCalculateCashInCommision = async (tempUserData) => {
-  let tempCommision = '';
-  let tempAmount = await tempUserData.operation.amount;
-  let tempConfig = await getAsyncConfig('http://private-38e18c-uzduotis.apiary-mock.com/config/cash-in');
-  tempCommision = ((tempAmount * tempConfig.percents) / 100);
-  return tempCommision > 5 ? 5 : tempCommision;
-};
-
-const asyncCalculateCashOutCommision = async (tempUserData) => {
-  let tempCommision = '';
-  let tempUserDate = tempUserData.date;
-  let tempUserId = tempUserData.user_id;
-  let tempUserType = tempUserData.user_type;
-  let tempUserAmount = tempUserData.operation.amount;
-  let tempNaturalConfig = await getAsyncConfig('http://private-38e18c-uzduotis.apiary-mock.com/config/cash-out/natural');
-  let tempLegalConfig = await getAsyncConfig('http://private-38e18c-uzduotis.apiary-mock.com/config/cash-out/juridical');
-
-  if(tempUserType === 'juridical') {
-    tempCommision = ((tempUserAmount * tempLegalConfig.percents) / 100);
-    tempCommision = tempCommision < 0.5 ? 0.5 : tempCommision;
-  } else {
-    if (tempUserAmount > 1000) {
-      tempCommision = (((tempUserAmount - 1000) * tempNaturalConfig.percents) / 100);
-    } else {
-      tempCommision = (((tempUserAmount) * tempNaturalConfig.percents) / 100);
-    }
+  if(transaction.type === 'cash_out') {
+    GETASYNCCOCOMM(transaction, transactions)
+      .then(async commission => {
+        console.log(`User: ${transaction.user_id} | Amount: ${transaction.operation.amount} | Transaction Type: ${transaction.type} | Transaction Date: ${transaction.date} | Commission: ${commission}`);
+      })
+      .catch(err => {
+        console.log('Error: something went wrong in calling GETASYNCCOCOMM');
+      });
   }
-
-  return tempCommision;
-};
-
-datas.forEach(async (tempData) => {
-  let commission = null;
-
-  if(tempData.type === 'cash_in') {
-    commission = await asyncCalculateCashInCommision(tempData);
-  }
-
-  if(tempData.type === 'cash_out') {
-    commission = await asyncCalculateCashOutCommision(tempData);
-  }
-
-  console.log(commission);
 });
